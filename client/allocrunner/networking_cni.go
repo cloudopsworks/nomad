@@ -94,9 +94,16 @@ func (c *cniNetworkConfigurator) Setup(ctx context.Context, alloc *structs.Alloc
 	const retry = 3
 	var firstError error
 	var res *cni.CNIResult
+
+	args := map[string]string{
+		"K8S_POD_NAMESPACE":          alloc.Namespace,
+		"K8S_POD_NAME":               alloc.Name,
+		"K8S_POD_INFRA_CONTAINER_ID": alloc.ID,
+	}
+
 	for attempt := 1; ; attempt++ {
 		var err error
-		if res, err = c.cni.Setup(ctx, alloc.ID, spec.Path, cni.WithCapabilityPortMap(getPortMapping(alloc, c.ignorePortMappingHostIP))); err != nil {
+		if res, err = c.cni.Setup(ctx, alloc.ID, spec.Path, cni.WithCapabilityPortMap(getPortMapping(alloc, c.ignorePortMappingHostIP)), cni.WithLabels(args)); err != nil {
 			c.logger.Warn("failed to configure network", "err", err, "attempt", attempt)
 			switch attempt {
 			case 1:
@@ -225,7 +232,13 @@ func (c *cniNetworkConfigurator) Teardown(ctx context.Context, alloc *structs.Al
 		return err
 	}
 
-	return c.cni.Remove(ctx, alloc.ID, spec.Path, cni.WithCapabilityPortMap(getPortMapping(alloc, c.ignorePortMappingHostIP)))
+	args := map[string]string{
+		"K8S_POD_NAMESPACE":          alloc.Namespace,
+		"K8S_POD_NAME":               alloc.Name,
+		"K8S_POD_INFRA_CONTAINER_ID": alloc.ID,
+	}
+
+	return c.cni.Remove(ctx, alloc.ID, spec.Path, cni.WithCapabilityPortMap(getPortMapping(alloc, c.ignorePortMappingHostIP)), cni.WithLabels(args))
 }
 
 func (c *cniNetworkConfigurator) ensureCNIInitialized() error {
